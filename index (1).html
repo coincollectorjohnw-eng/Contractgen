@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contract Filler</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1d2026; --line:#2c313a; --text:#e8eaed; --muted:#9aa3af;
+    --accent:#f5a623; --accent-dark:#c98412; --danger:#e5484d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:16px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0}
+  header span{color:var(--muted);font-size:14px}
+  .layout{display:grid;grid-template-columns:380px 1fr;gap:24px;padding:24px;max-width:1350px;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;align-self:start;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+  .panel h2{font-size:13px;margin:18px 0 10px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
+  .panel h2:first-child{margin-top:0}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+  input,select,textarea{width:100%;padding:9px 10px;border-radius:6px;border:1px solid var(--line);background:#12141a;color:var(--text);font-size:14px;font-family:inherit}
+  textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.45;min-height:380px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);border-color:transparent}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  button{padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:#262b33;color:var(--text);cursor:pointer;font-size:13px}
+  button:hover{background:#2f353f}
+  button.primary{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
+  button.primary:hover{background:var(--accent-dark)}
+  button.danger{color:var(--danger)}
+  .note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.45}
+  details{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  details summary{cursor:pointer;color:var(--text)}
+  details pre{background:#12141a;border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;white-space:pre-wrap;line-height:1.4}
+  .hidden{display:none!important}
+  .empty{color:var(--muted);font-size:13px}
+  .paper-wrap{display:flex;justify-content:center}
+  #contract{background:#fff;color:#111;width:100%;max-width:820px;padding:56px 64px;border-radius:4px;
+    font-family:Georgia,"Times New Roman",serif;font-size:14.5px;line-height:1.55;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+  #contract h1{text-align:center;font-size:22px;margin:0 0 2px;letter-spacing:.04em}
+  #contract h2.sub{text-align:center;font-size:16px;margin:0 0 24px;font-weight:normal}
+  #contract h3{font-size:15px;margin:22px 0 6px}
+  #contract p{margin:6px 0}
+  #contract ul{margin:6px 0 6px 22px;padding:0}
+  #contract li{margin:3px 0}
+  .fill{background:#fff3cd;border-bottom:1px solid #e0b100;padding:0 2px}
+  .fill.done{background:#e3f4e1;border-bottom-color:#3a9b3a}
+  .sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:48px}
+  .sig div{border-top:1px solid #111;padding-top:4px;font-size:13px}
+  @media (max-width:950px){
+    .layout{grid-template-columns:1fr}
+    .panel{position:static;max-height:none}
+    #contract{padding:28px 22px}
+  }
+  @media print{
+    body{background:#fff}
+    header,.panel{display:none!important}
+    .layout{display:block;padding:0;max-width:none}
+    #contract{box-shadow:none;padding:0;max-width:none;font-size:12pt}
+    .fill,.fill.done{background:none;border-bottom:none;padding:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Contract Filler</h1>
+  <span>Pick a contract, fill the blanks, print or save as PDF</span>
+</header>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Contract</h2>
+    <select id="contractSelect"></select>
+    <div class="btns">
+      <button type="button" id="editBtn">Edit contract</button>
+      <button type="button" id="newBtn">New</button>
+      <button type="button" id="dupBtn">Duplicate</button>
+      <button type="button" id="delBtn" class="danger">Delete</button>
+    </div>
+
+    <!-- FILL MODE -->
+    <div id="fillMode">
+      <h2>Fill in details</h2>
+      <div id="fields"></div>
+      <div class="btns">
+        <button type="button" class="primary" id="printBtn">Print / Save PDF</button>
+        <button type="button" id="copyBtn">Copy text</button>
+        <button type="button" id="clearBtn">Clear</button>
+      </div>
+      <div class="note">
+        Yellow = empty, green = filled. Day / Month / Year default to today. Filled-in info is never stored or sent anywhere. For a PDF, click Print and choose "Save as PDF".
+      </div>
+    </div>
+
+    <!-- EDIT MODE -->
+    <div id="editMode" class="hidden">
+      <h2>Edit contract</h2>
+      <label for="nameInput">Contract name (for the dropdown)</label>
+      <input id="nameInput" type="text">
+      <label for="textInput">Contract text</label>
+      <textarea id="textInput" spellcheck="false"></textarea>
+      <div class="btns">
+        <button type="button" class="primary" id="saveBtn">Save</button>
+        <button type="button" id="cancelBtn">Cancel</button>
+      </div>
+      <div class="note" id="dirtyNote"></div>
+      <details>
+        <summary>How to write a contract</summary>
+<pre>Put any blank in [square brackets]:
+  [Employee Full Legal Name]
+Each different bracket becomes a form field.
+Use the same bracket twice and it fills in both places.
+[Day] [Month] [Year] auto-fill with today's date.
+[Date] auto-fills with the full date.
+
+# Big centered title
+## Centered subtitle
+### Section heading
+- Bullet point
+**Bold text**
+@sign Left label | Right label
+
+Blank line = new paragraph.
+A new line inside a paragraph = line break.</pre>
+      </details>
+    </div>
+
+    <h2>Library</h2>
+    <div class="btns" style="margin-top:0">
+      <button type="button" id="exportBtn">Export all (.json)</button>
+      <button type="button" id="importBtn">Import (.json)</button>
+      <button type="button" id="restoreBtn">Restore sample</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+    <div class="note">
+      Contracts are saved in this browser only. Use Export to back them up or move them to another device / browser, and Import to load them there.
+    </div>
+  </div>
+
+  <div class="paper-wrap">
+    <article id="contract"></article>
+  </div>
+</div>
+
+<script>
+(function () {
+  var STORE_KEY = "contractFiller.v1";
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  var SAMPLE_TEXT = [
+"# EMPLOYMENT AGREEMENT",
+"## Rocky Road Tow",
+"",
+"This Employment Agreement (“Agreement”) is made on this [Day] of [Month], [Year], by and between Rocky Road Tow (“Company”) and [Employee Full Legal Name], collectively referred to as the \"Parties.\"",
+"",
+"### 1. Employee Information",
+"Full Name: [Name]",
+"SSN: [SSN]",
+"Phone Number: [Phone Number]",
+"Driver’s License #: [DL#]",
+"",
+"### 2. Duties of Employee",
+"The Company has full authority over all business decisions. The Employee agrees to:",
+"- Follow all company policies, SOPs, and applicable law.",
+"- Maintain all required licenses.",
+"- Wear the company dress code while on duty.",
+"- Participate in required training as instructed.",
+"- Use company trackers or logs accurately when required.",
+"- Pay weekly Employee Dues (“Employment Fee”) of a minimum of $5,000 every Sunday to Account #4966714.",
+"",
+"**Minimum Work Requirements:**",
+"- Employee must clock in at least 4 total hours per week.",
+"- Each clock-in must be at least 1 continuous hour.",
+"",
+"**Company Vehicles:**",
+"- All tow trucks and equipment operated by the Employee remain Company property.",
+"- Employee must return all Rocky Road Tow trucks to the Rocky Road garage at the end of each shift.",
+"- Trucks must be repaired before returning to Rocky Road.",
+"- Employees may not take Company vehicles for personal use, off-duty use, or store them outside the Rocky Road garage.",
+"",
+"### 3. Compensation",
+"The Employee may receive standard tow payouts, bonuses, or other earnings as determined by the Company. All compensation is subject to Company policy and may change at any time.",
+"",
+"### 4. Confidentiality",
+"All Company and client information must be kept confidential during and after employment. This obligation continues indefinitely.",
+"",
+"### 5. Non-Compete",
+"During employment and for 90 days after, Employee may not:",
+"- Work for or represent a competing tow or vehicle service business without written consent.",
+"- Solicit Company clients for another business.",
+"- Partner with current or former Rocky Road Tow staff to compete.",
+"- Engage in any paid or unpaid work for a competitor.",
+"",
+"### 6. Term & Termination",
+"Employment is indefinite unless ended by written notice. The Company may terminate employment at any time with or without notice.",
+"Upon termination, Employee must immediately stop using all Company vehicles, equipment, or resources and return all Company property.",
+"",
+"### 7. Default & Remedies",
+"If Employee violates this Agreement or fails to pay Employee Dues, the Company may:",
+"- Terminate employment immediately.",
+"- Seek legal remedies.",
+"- Recover damages or losses caused by Employee actions.",
+"",
+"### 8. Indemnification",
+"Employee agrees to protect and reimburse the Company for any claims, costs, or damages (including attorney fees and court costs) arising from the Employee’s actions, except where caused by Company misconduct or gross negligence.",
+"This includes any claims that Employee’s actions or work infringe on third-party rights.",
+"",
+"### 9. Legal Procedure",
+"If claims arise due to the Employee’s actions, the Company will notify the Employee and allow them to handle the defense. The Employee is responsible for all costs of defense and settlement.",
+"",
+"### 10. Governing Law",
+"This Agreement is governed by the laws and Civilian Rights of the State of San Andreas.",
+"",
+"### 11. Entire Agreement",
+"This Agreement replaces all prior discussions and agreements. Any changes must be in writing and signed by both Parties.",
+"",
+"@sign Employee Signature & Date | Rocky Road Tow Representative & Date"
+  ].join("\n");
+
+  var BLANK_TEXT = [
+"# CONTRACT TITLE",
+"## Company Name",
+"",
+"This Agreement is made on this [Day] of [Month], [Year], between [Company Name] and [Full Name].",
+"",
+"### 1. First Section",
+"Write your terms here. Anything in [brackets] becomes a fill-in field.",
+"- A bullet point",
+"- Another bullet point",
+"",
+"@sign Signature & Date | Signature & Date"
+  ].join("\n");
+
+  var SAMPLE_ID = "sample-rocky-road-employment";
+
+  // ---------- state ----------
+  var contracts = [];
+  var currentId = null;
+  var editing = false;
+  var values = {};          // lowercase label -> value (memory only)
+  var dateTouched = {};     // which date fields user edited
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- storage ----------
+  function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (Array.isArray(data) && data.length) { contracts = data; return; }
+      }
+    } catch (e) {}
+    contracts = [{ id: SAMPLE_ID, name: "Rocky Road Tow - Employment Agreement", text: SAMPLE_TEXT }];
+    save();
+  }
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(contracts)); } catch (e) {}
+  }
+
+  function getCurrent() {
+    for (var i = 0; i < contracts.length; i++) if (contracts[i].id === currentId) return contracts[i];
+    return contracts[0];
+  }
+
+  // ---------- placeholders ----------
+  var PH_RE = /\[([^\[\]\n]+)\]/g;
+
+  function keyOf(label) { return label.trim().toLowerCase(); }
+
+  function findFields(text) {
+    var seen = {}, list = [], m;
+    PH_RE.lastIndex = 0;
+    while ((m = PH_RE.exec(text)) !== null) {
+      var k = keyOf(m[1]);
+      if (!seen[k]) { seen[k] = true; list.push({ key: k, label: m[1].trim() }); }
+    }
+    return list;
+  }
+
+  function todayDefault(key) {
+    var d = new Date();
+    if (key === "day") return String(d.getDate());
+    if (key === "month") return MONTHS[d.getMonth()];
+    if (key === "year") return String(d.getFullYear());
+    if (key === "date") return MONTHS[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+    return null;
+  }
+
+  function getValue(key) {
+    if (Object.prototype.hasOwnProperty.call(values, key)) return values[key];
+    var t = todayDefault(key);
+    return t === null ? "" : t;
+  }
+
+  function ordinal(n) {
+    var v = parseInt(n, 10);
+    if (isNaN(v)) return n;
+    var s = ["th", "st", "nd", "rd"], m = v % 100;
+    return v + (s[(m - 20) % 10] || s[m] || s[0]);
+  }
+
+  function displayValue(key, val) {
+    val = (val || "").trim();
+    if (key === "day" && val) return ordinal(val);
+    return val;
+  }
+
+  // ---------- rendering the contract ----------
+  function addInline(parent, text) {
+    var re = /\*\*([^*]+)\*\*|\[([^\[\]\n]+)\]/g;
+    var last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
+      if (m[1] !== undefined) {
+        var strong = document.createElement("strong");
+        addInline(strong, m[1]);
+        parent.appendChild(strong);
+      } else {
+        var key = keyOf(m[2]);
+        var span = document.createElement("span");
+        span.className = "fill";
+        span.dataset.key = key;
+        span.dataset.ph = "[" + m[2].trim() + "]";
+        var val = displayValue(key, getValue(key));
+        if (val) { span.textContent = val; span.classList.add("done"); }
+        else { span.textContent = span.dataset.ph; }
+        parent.appendChild(span);
+      }
+      last = re.lastIndex;
+    }
+    if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+  }
+
+  function renderContract(text) {
+    var root = $("contract");
+    root.textContent = "";
+    var lines = text.replace(/\r\n?/g, "\n").split("\n");
+    var para = null, ul = null;
+
+    function closeAll() { para = null; ul = null; }
+
+    lines.forEach(function (line) {
+      var t = line.replace(/\s+$/, "");
+      var el;
+      if (/^\s*$/.test(t)) { closeAll(); return; }
+      if (/^### /.test(t)) { closeAll(); el = document.createElement("h3"); addInline(el, t.slice(4)); root.appendChild(el); return; }
+      if (/^## /.test(t))  { closeAll(); el = document.createElement("h2"); el.className = "sub"; addInline(el, t.slice(3)); root.appendChild(el); return; }
+      if (/^# /.test(t))   { closeAll(); el = document.createElement("h1"); addInline(el, t.slice(2)); root.appendChild(el); return; }
+      if (/^@sign\s/i.test(t)) {
+        closeAll();
+        var parts = t.replace(/^@sign\s+/i, "").split("|");
+        el = document.createElement("div"); el.className = "sig";
+        parts.forEach(function (p) { var d = document.createElement("div"); addInline(d, p.trim()); el.appendChild(d); });
+        root.appendChild(el);
+        return;
+      }
+      if (/^\s*[-•] /.test(t)) {
+        para = null;
+        if (!ul) { ul = document.createElement("ul"); root.appendChild(ul); }
+        var li = document.createElement("li");
+        addInline(li, t.replace(/^\s*[-•] /, ""));
+        ul.appendChild(li);
+        return;
+      }
+      ul = null;
+      if (!para) { para = document.createElement("p"); root.appendChild(para); }
+      else para.appendChild(document.createElement("br"));
+      addInline(para, t);
+    });
+  }
+
+  function activeText() {
+    return editing ? $("textInput").value : getCurrent().text;
+  }
+
+  function refresh() { renderContract(activeText()); }
+
+  // ---------- fields form ----------
+  function buildFields() {
+    var box = $("fields");
+    box.textContent = "";
+    var fields = findFields(getCurrent().text);
+    if (!fields.length) {
+      var p = document.createElement("div");
+      p.className = "empty";
+      p.textContent = "This contract has no [blanks]. Click Edit contract to add some.";
+      box.appendChild(p);
+      return;
+    }
+    fields.forEach(function (f) {
+      var lab = document.createElement("label");
+      lab.textContent = f.label;
+      var inp = document.createElement("input");
+      inp.type = "text";
+      inp.id = "f_" + f.key.replace(/[^a-z0-9]+/g, "_");
+      inp.value = getValue(f.key);
+      inp.addEventListener("input", function () {
+        values[f.key] = inp.value;
+        refresh();
+      });
+      lab.htmlFor = inp.id;
+      box.appendChild(lab);
+      box.appendChild(inp);
+    });
+  }
+
+  // ---------- selector ----------
+  function buildSelect() {
+    var sel = $("contractSelect");
+    sel.textContent = "";
+    contracts.forEach(function (c) {
+      var o = document.createElement("option");
+      o.value = c.id; o.textContent = c.name || "(untitled)";
+      if (c.id === currentId) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  // ---------- modes ----------
+  function setEditing(on) {
+    editing = on;
+    $("fillMode").classList.toggle("hidden", on);
+    $("editMode").classList.toggle("hidden", !on);
+    $("editBtn").classList.toggle("hidden", on);
+    $("contractSelect").disabled = on;
+    $("newBtn").disabled = on; $("dupBtn").disabled = on; $("delBtn").disabled = on;
+    if (on) {
+      var c = getCurrent();
+      $("nameInput").value = c.name;
+      $("textInput").value = c.text;
+      $("dirtyNote").textContent = "";
+    } else {
+      buildFields();
+    }
+    refresh();
+  }
+
+  function selectContract(id) {
+    currentId = id;
+    buildSelect();
+    buildFields();
+    refresh();
+  }
+
+  // ---------- events ----------
+  $("contractSelect").addEventListener("change", function () { selectContract(this.value); });
+
+  $("editBtn").addEventListener("click", function () { setEditing(true); });
+
+  $("textInput").addEventListener("input", function () {
+    $("dirtyNote").textContent = "Unsaved changes (preview is live).";
+    refresh();
+  });
+  $("nameInput").addEventListener("input", function () {
+    $("dirtyNote").textContent = "Unsaved changes (preview is live).";
+  });
+
+  $("saveBtn").addEventListener("click", function () {
+    var c = getCurrent();
+    c.name = $("nameInput").value.trim() || "Untitled contract";
+    c.text = $("textInput").value;
+    save();
+    buildSelect();
+    setEditing(false);
+  });
+
+  $("cancelBtn").addEventListener("click", function () { setEditing(false); });
+
+  $("newBtn").addEventListener("click", function () {
+    var c = { id: uid(), name: "New contract", text: BLANK_TEXT };
+    contracts.push(c);
+    save();
+    currentId = c.id;
+    buildSelect();
+    setEditing(true);
+  });
+
+  $("dupBtn").addEventListener("click", function () {
+    var src = getCurrent();
+    var c = { id: uid(), name: src.name + " (copy)", text: src.text };
+    contracts.push(c);
+    save();
+    selectContract(c.id);
+  });
+
+  $("delBtn").addEventListener("click", function () {
+    var c = getCurrent();
+    if (!confirm("Delete \"" + c.name + "\"? This can't be undone (export first if unsure).")) return;
+    contracts = contracts.filter(function (x) { return x.id !== c.id; });
+    if (!contracts.length) contracts.push({ id: uid(), name: "New contract", text: BLANK_TEXT });
+    save();
+    selectContract(contracts[0].id);
+  });
+
+  $("printBtn").addEventListener("click", function () {
+    var old = document.title;
+    document.title = getCurrent().name;
+    window.print();
+    document.title = old;
+  });
+
+  $("copyBtn").addEventListener("click", function () {
+    var btn = this;
+    var text = $("contract").innerText;
+    function done() { btn.textContent = "Copied!"; setTimeout(function () { btn.textContent = "Copy text"; }, 1500); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta); done();
+    }
+  });
+
+  $("clearBtn").addEventListener("click", function () {
+    values = {};
+    // explicitly blank everything except dates, which return to today
+    findFields(getCurrent().text).forEach(function (f) {
+      if (todayDefault(f.key) === null) values[f.key] = "";
+    });
+    buildFields();
+    refresh();
+  });
+
+  $("exportBtn").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify(contracts, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "contracts.json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  $("importBtn").addEventListener("click", function () { $("importFile").click(); });
+
+  $("importFile").addEventListener("change", function () {
+    var file = this.files && this.files[0];
+    var input = this;
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!Array.isArray(data)) throw new Error("bad");
+        var added = 0;
+        data.forEach(function (c) {
+          if (c && typeof c.text === "string") {
+            contracts.push({ id: uid(), name: String(c.name || "Imported contract"), text: c.text });
+            added++;
+          }
+        });
+        if (!added) throw new Error("none");
+        save();
+        selectContract(contracts[contracts.length - 1].id);
+        alert("Imported " + added + " contract" + (added === 1 ? "" : "s") + ".");
+      } catch (e) {
+        alert("That file isn't a valid contracts .json export.");
+      }
+      input.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  $("restoreBtn").addEventListener("click", function () {
+    var c = { id: uid(), name: "Rocky Road Tow - Employment Agreement (sample)", text: SAMPLE_TEXT };
+    contracts.push(c);
+    save();
+    selectContract(c.id);
+  });
+
+  // ---------- init ----------
+  load();
+  currentId = contracts[0].id;
+  buildSelect();
+  buildFields();
+  refresh();
+})();
+</script>
+</body>
+</html>
