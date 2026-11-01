@@ -154,7 +154,7 @@ A new line inside a paragraph = line break.</pre>
 "This Employment Agreement (“Agreement”) is made on this [Day] of [Month], [Year], by and between Rocky Road Tow (“Company”) and [Employee Full Legal Name], collectively referred to as the \"Parties.\"",
 "",
 "### 1. Employee Information",
-"Full Name: [Name]",
+"Full Name: [Employee Full Legal Name]",
 "SSN: [SSN]",
 "Phone Number: [Phone Number]",
 "Driver’s License #: [DL#]",
@@ -250,7 +250,19 @@ A new line inside a paragraph = line break.</pre>
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var data = JSON.parse(raw);
-        if (Array.isArray(data) && data.length) { contracts = data; return; }
+        if (Array.isArray(data) && data.length) {
+          contracts = data;
+          // one-time fix: older saved copies used a separate [Name] blank in Section 1
+          var changed = false;
+          contracts.forEach(function (c) {
+            if (c && typeof c.text === "string" && c.text.indexOf("Full Name: [Name]") !== -1) {
+              c.text = c.text.split("Full Name: [Name]").join("Full Name: [Employee Full Legal Name]");
+              changed = true;
+            }
+          });
+          if (changed) save();
+          return;
+        }
       }
     } catch (e) {}
     contracts = [{ id: SAMPLE_ID, name: "Rocky Road Tow - Employment Agreement", text: SAMPLE_TEXT }];
