@@ -87,7 +87,7 @@
         <button type="button" id="clearBtn">Clear</button>
       </div>
       <div class="note">
-        Yellow = empty, green = filled. Day / Month / Year default to today. Click Copy contract to copy the finished text, then paste it where you need it. Filled-in info is never stored or sent anywhere.
+        Yellow = empty, green = filled. The date ([Day], [Month], [Year], [Date]) fills in automatically with today's date. Click Copy contract to copy the finished text, then paste it where you need it. Filled-in info is never stored or sent anywhere.
       </div>
     </div>
 
@@ -394,11 +394,14 @@ A new line inside a paragraph = line break.</pre>
   function buildFields() {
     var box = $("fields");
     box.textContent = "";
-    var fields = findFields(getCurrent().text);
+    // Day / Month / Year / Date are filled in automatically, so they get no form field
+    var fields = findFields(getCurrent().text).filter(function (f) {
+      return todayDefault(f.key) === null;
+    });
     if (!fields.length) {
       var p = document.createElement("div");
       p.className = "empty";
-      p.textContent = "This contract has no [blanks]. Click Edit contract to add some.";
+      p.textContent = "No fields to fill in for this contract (dates fill in automatically). Click Edit contract to add [blanks].";
       box.appendChild(p);
       return;
     }
