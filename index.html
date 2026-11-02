@@ -83,12 +83,11 @@
       <h2>Fill in details</h2>
       <div id="fields"></div>
       <div class="btns">
-        <button type="button" class="primary" id="printBtn">Print / Save PDF</button>
-        <button type="button" id="copyBtn">Copy text</button>
+        <button type="button" class="primary" id="copyBtn">Copy contract</button>
         <button type="button" id="clearBtn">Clear</button>
       </div>
       <div class="note">
-        Yellow = empty, green = filled. Day / Month / Year default to today. Filled-in info is never stored or sent anywhere. For a PDF, click Print and choose "Save as PDF".
+        Yellow = empty, green = filled. Day / Month / Year default to today. Click Copy contract to copy the finished text, then paste it where you need it. Filled-in info is never stored or sent anywhere.
       </div>
     </div>
 
@@ -508,17 +507,38 @@ A new line inside a paragraph = line break.</pre>
     selectContract(contracts[0].id);
   });
 
-  $("printBtn").addEventListener("click", function () {
-    var old = document.title;
-    document.title = getCurrent().name;
-    window.print();
-    document.title = old;
-  });
+  function fillText(s) {
+    return s.replace(PH_RE, function (m, label) {
+      var k = keyOf(label);
+      var v = displayValue(k, getValue(k));
+      return v || ("[" + label.trim() + "]");
+    });
+  }
+
+  function plainText() {
+    var out = [];
+    var lines = fillText(activeText()).replace(/\r\n?/g, "\n").split("\n");
+    lines.forEach(function (line) {
+      var t = line.replace(/\s+$/, "");
+      if (/^### /.test(t)) { out.push("", t.slice(4).replace(/\*\*/g, "")); return; }
+      if (/^## /.test(t)) { out.push(t.slice(3).replace(/\*\*/g, "")); return; }
+      if (/^# /.test(t)) { out.push(t.slice(2).replace(/\*\*/g, "")); return; }
+      if (/^@sign\s/i.test(t)) {
+        t.replace(/^@sign\s+/i, "").split("|").forEach(function (p) {
+          out.push("", "______________________________", p.trim());
+        });
+        return;
+      }
+      if (/^\s*[-•] /.test(t)) { out.push("• " + t.replace(/^\s*[-•] /, "").replace(/\*\*/g, "")); return; }
+      out.push(t.replace(/\*\*/g, ""));
+    });
+    return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  }
 
   $("copyBtn").addEventListener("click", function () {
     var btn = this;
-    var text = $("contract").innerText;
-    function done() { btn.textContent = "Copied!"; setTimeout(function () { btn.textContent = "Copy text"; }, 1500); }
+    var text = plainText();
+    function done() { btn.textContent = "Copied!"; setTimeout(function () { btn.textContent = "Copy contract"; }, 1500); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done);
     } else {
